@@ -8,22 +8,35 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup SSH
+      - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           printf "%s" "${{ secrets.ACTIONS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-
           chmod 600 ~/.ssh/id_ed25519
-          echo "Host azurevm
-            HostName 131.163.81.38
-            User azureuser
-            IdentityFile ~/.ssh/id_ed25519
-            StrictHostKeyChecking no" >> ~/.ssh/config
+          printf "%s\n" "Host azurevm" "  HostName 131.163.81.38" "  User azureuser" "  IdentityFile ~/.ssh/id_ed25519" "  StrictHostKeyChecking no" >> ~/.ssh/config
 
-      - name: Deploy files to VM
+      - name: Deploy site files with rsync (respect .rsyncignore)
         run: |
-          rsync -avz --delete ./ azurevm:/var/www/html/
+          # install rsync on runner if missing
+          sudo apt-get update -y
+          sudo apt-get install -y rsync
+          # use .rsyncignore if present, otherwise exclude patterns
+          if [ -f .rsyncignore ]; then
+            rsync -avz --delete --exclude-from='.rsyncignore' ./ azurevm:/var/www/html/
+          else
+            rsync -avz --delete \
+              --exclude '.git' \
+              --exclude '.github' \
+              --exclude '*.key' \
+              --exclude '*.pub' \
+              --exclude 'gh-actions-key' \
+              --exclude 'gh-actions-key.pub' \
+              ./ azurevm:/var/www/html/
+          fi
