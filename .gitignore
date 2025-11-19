@@ -1,0 +1,5 @@
+﻿
+# keep sensitive files out of repo
+.rsyncignore
+gh-actions-key
+gh-actions-key.pub
